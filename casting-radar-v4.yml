@@ -1,0 +1,302 @@
+name: Matthew Paid Casting Radar
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: "Use bootstrap/current once, or scan only new listings"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - current
+          - new
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan casting sources
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sources = [
+              // THEATRE / CASTING PLATFORMS
+              ["Playbill", "https://playbill.com/jobs?category=Performer&show=100", /\/job\/(?!listing(?:\/|$))/i],
+              ["BroadwayWorld", "https://www.broadwayworld.com/theatre-auditions/?show=100&strt=1", /\/(?:equity|non-equity)-audition\//i],
+              ["Theatre Bay Area", "https://www.theatrebayarea.org/view-listings/", /\/(?:job|audition|auditions|casting|listing)\//i],
+              ["Tuacahn", "https://www.tuacahn.org/auditions/", /\/(?:audition|auditions|job|jobs)\//i],
+              ["Music Circus / Broadway Sacramento", "https://www.broadwaysacramento.com/participate/auditions/", /\/(?:audition|auditions|job|jobs)\//i],
+              ["Berkeley Rep", "https://www.berkeleyrep.org/get-involved-5xnz", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["A.C.T.", "https://www.act-sf.org/about-us/opportunities/auditions", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["TheatreWorks Silicon Valley", "https://theatreworks.org/work-with-us/auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Oregon Shakespeare Festival", "https://www.osfashland.org/en/work-with-us/audition-information.aspx", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Marin Theatre", "https://www.marintheatre.org/epa", /\/(?:epa|audition|auditions|job|jobs|casting)\//i],
+              ["San Francisco Playhouse", "https://sfplayhouse.org/get-involved/casting/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Center REP", "https://www.centerrep.org/get-involved/audition", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["B Street Theatre", "https://bstreettheatre.org/auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Santa Cruz Shakespeare", "https://santacruzshakespeare.org/auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Marin Shakespeare", "https://www.marinshakespeare.org/audition-information/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["San Francisco Shakespeare Festival", "https://sfshakes.org/join/auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["North Shore Music Theatre", "https://www.nsmt.org/auditions.html", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Ogunquit Playhouse", "https://www.ogunquitplayhouse.org/contact-us/auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Arizona Broadway Theatre", "https://www.azbroadway.org/auditions", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["5th Avenue Theatre", "https://www.5thavenue.org/about/careers/auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["La Jolla Playhouse", "https://lajollaplayhouse.org/who-we-are/artists-and-programs/play-submissions-auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["The Old Globe", "https://www.theoldglobe.org/get-involved/auditions-and-assistant-directors/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Portland Center Stage", "https://www.pcs.org/about/casting-and-script-submission", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["South Coast Repertory", "https://www.scr.org/about/about-scr-landing/employment-and-auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Barrington Stage", "https://barringtonstageco.org/about-the-company/casting/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Denver Center", "https://www.denvercenter.org/about-us/careers/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Goodman Theatre", "https://www.goodmantheatre.org/artists-archive/auditions/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Steppenwolf", "https://www.steppenwolf.org/about-us/work-with-us/casting/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Guthrie Theater", "https://www.guthrietheater.org/about/work-with-us/", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Shakespeare Theatre Company", "https://www.shakespearetheatre.org/about/careers-and-casting/auditions", /\/(?:audition|auditions|job|jobs|casting)\//i],
+              ["Cincinnati Playhouse", "https://www.cincyplay.com/about/opportunities/auditions", /\/(?:audition|auditions|job|jobs|casting)\//i],
+
+              // THEME PARK / LIVE ENTERTAINMENT
+              ["Disney Auditions", "https://jobs.disneycareers.com/auditions/", /\/auditions(?:\?|\/).*(?:aud_id|event|audition)/i],
+              ["Universal Studios Hollywood", "https://jobs.universalparks.com/universal-studios-hollywood", /\/job\//i],
+              ["Universal Parks", "https://jobs.universalparks.com/search/?q=entertainment", /\/job\//i],
+              ["Universal Horror Unleashed", "https://jobs.universalparks.com/las-vegas-auditions/", /\/job\//i],
+              ["Universal Kids Resort", "https://jobs.universalparks.com/frisco-auditions/", /\/job\//i],
+
+              // CRUISE / SHIP ENTERTAINMENT
+              ["Royal Caribbean Productions", "https://royalcaribbeanentertainment.com/productions/upcoming-auditions/", /\/productions\/auditions\//i],
+              ["Royal Caribbean Entertainment Careers", "https://royalcaribbeanentertainment.com/productions/careers/", /\/productions\/(?:auditions|careers)\//i],
+              ["Royal Caribbean Group Ship Careers", "https://careers.royalcaribbeangroup.com/ship/", /\/(?:job|jobs|position|careers)\//i],
+            ];
+
+            const relevant = /\b(casting call|open casting|open call|now casting|actors wanted|actor wanted|performers wanted|audition notice|audition|casting|cast call|self[- ]?tape|EPA|ECC|general audition|national tour|touring|performer|actor|singer|dancer|vocalist|entertainment|character performer|cruise|shipboard)\b/i;
+            const paid = /(\$\s*[\d,]+(?:\.\d+)?\s*(?:\/|per\s+)?(?:hour|hr|day|week|wk|show|performance|contract)?|\bpaid\b|salary|hourly|weekly|per performance|per show|contract rate|minimum\s+\$|Equity|SAG[- ]?AFTRA|union minimum|wage)/i;
+            const forbidden = /\b(stipend|honorarium|volunteer|unpaid|no pay|deferred|profit share|exposure|pay[- ]?to[- ]?play|voice[- ]?over|voice actor|internship|intern)\b/i;
+            const articleNoise = /\b(warning|scam|scams|should actors|opinion|editorial|column|footage|viral|goes viral|review|reviews|interview|podcast|news|behind the scenes|history|explainer)\b/i;
+            const actionable = /\b(apply|application|submit|submission|self[- ]?tape|deadline|audition|callback|casting call|open call|roles?|role|seeking|looking for|send (?:headshot|resume|reel)|breakdown|audition date|contract|rehearsal|performances?)\b/i;
+            const performerRole = /\b(actor|actors|performer|performers|singer|singers|vocalist|vocalists|dancer|dancers|musician|musicians|character performer|entertainer|entertainment|host|hosts|specialty act|variety act|artist)\b/i;
+            const ageFit = /\b(?:20|21|22|23|24|25|26|27|28|29|30)\s*(?:-|–|—|to)\s*(?:20|21|22|23|24|25|26|27|28|29|30)\b|\b(?:20|21|22|23|24|25|26|27|28|29|30)\s*(?:years? old|yo|y\/o)\b|\b(?:playing|character|role)\s+age\s*[:\-]?\s*(?:20|21|22|23|24|25|26|27|28|29|30)\b/i;
+            const maleFit = /\b(male|man|men|boy|young man|he\/him|he\/they|non[- ]?binary|gender[- ]?nonconforming|any gender|all genders|gender neutral|gender inclusive)\b/i;
+            const femaleOnly = /\b(female|woman|women|girl|she\/her)\b/i;
+
+            async function get(url) {
+              const r = await fetch(url, {headers: {"User-Agent": "Matthew-Casting-Radar/4.0"}});
+              if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+              return await r.text();
+            }
+
+            function decode(s) {
+              return (s || "")
+                .replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+                .replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&nbsp;/g," ");
+            }
+
+            function textOnly(s) {
+              return decode((s || "")
+                .replace(/<script[\s\S]*?<\/script>/gi," ")
+                .replace(/<style[\s\S]*?<\/style>/gi," ")
+                .replace(/<noscript[\s\S]*?<\/noscript>/gi," ")
+                .replace(/<[^>]+>/g," ")
+                .replace(/\s+/g," ")).trim();
+            }
+
+            function meta(html, key) {
+              const re = new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${key}["']`, "i");
+              const m = html.match(re);
+              return m ? decode(m[1] || m[2]) : "";
+            }
+
+            function titleOf(html) {
+              return textOnly(meta(html,"og:title") || meta(html,"twitter:title") || ((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||""));
+            }
+
+            function descriptionOf(html) {
+              return textOnly(meta(html,"og:description") || meta(html,"description") || "");
+            }
+
+            function extractLinks(html, base) {
+              const out = [];
+              const re = /href\s*=\s*["']([^"']+)["']/gi;
+              let m;
+              while ((m = re.exec(html))) {
+                try {
+                  const u = new URL(m[1], base).href;
+                  if (u.startsWith("http")) out.push(u);
+                } catch {}
+              }
+              return [...new Set(out)];
+            }
+
+            function compact(s, max=500) {
+              return (s || "").replace(/\s+/g," ").trim().slice(0,max);
+            }
+
+            function extractPay(t) {
+              const lines = (t.match(/[^.!?]*(?:\$\s*[\d,]+(?:\.\d+)?|paid|salary|hourly|weekly|per performance|per show|Equity|SAG[- ]?AFTRA|union minimum|wage)[^.!?]*/ig) || [])
+                .map(x => compact(x, 240))
+                .filter(x => !/shop|merch|donat|advertis|tuition|membership|ticket|student|sponsor/i.test(x));
+              return [...new Set(lines)].slice(0,4).join(" | ");
+            }
+
+            function extractDates(t) {
+              const lines = (t.match(/[^.!?]*(?:audition date|audition|submission|deadline|callback|rehearsal|contract|performance|closing|opening)[^.!?]*/ig) || [])
+                .map(x => compact(x, 260));
+              return [...new Set(lines)].slice(0,4).join(" | ");
+            }
+
+            function looksLikeDirectoryPage(url, title, body) {
+              const genericTitle = /^(?:theater|theatre)?\s*(?:auditions?|casting)(?:\s+in\s+.*)?|^(?:broadway|regional)\s+(?:and|&)\s+(?:regional\s+)?theatre\s+auditions?|^find jobs|^jobs listing|^auditions?$/i;
+              const genericPath = /\/(?:jobs?|auditions?|theatre-auditions?|casting)\/?(?:\?.*)?$/i;
+              const hasManyListings = (body.match(/get audition information|view job|search results|sort by|filter|back to all listings/ig) || []).length >= 2;
+              return genericTitle.test(title) || genericPath.test(new URL(url).pathname) || hasManyListings;
+            }
+
+            function hasIndividualNotice(c, body) {
+              const detailSignals = [
+                /\b(?:seeking|seeks|talent sought|roles?\s*(?:available|include)|breakdown)\b/i,
+                /\b(?:audition date|audition time|open call|self[- ]?tape|submission deadline|apply now|submit)\b/i,
+                /\b(?:contract|rehearsal|performance|salary|weekly|per performance|Equity|SAG[- ]?AFTRA|paid)\b/i,
+                /\b(?:location|audition city|city|address)\b/i,
+              ];
+              return detailSignals.filter(r => r.test(body)).length >= 3;
+            }
+
+            async function bootstrapExists() {
+              try {
+                await github.rest.repos.getContent({owner: context.repo.owner, repo: context.repo.repo, path: ".casting-radar-v4-bootstrap"});
+                return true;
+              } catch { return false; }
+            }
+
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner, repo: context.repo.repo, state: "all", per_page: 100
+            });
+
+            const existingUrls = new Set();
+            for (const i of existing) {
+              for (const m of (i.body || "").matchAll(/https?:\/\/[^\s)]+/g)) existingUrls.add(m[0]);
+            }
+
+            const manualMode = context.eventName === "workflow_dispatch" ? (core.getInput("scan_mode") || "auto") : "auto";
+            const booted = await bootstrapExists();
+            const scanMode = manualMode === "current" ? "current" : manualMode === "new" ? "new" : (booted ? "new" : "current");
+            const currentListingsRun = scanMode === "current";
+            core.info(`Radar v4 scan mode: ${scanMode}; bootstrap exists: ${booted}`);
+
+            const candidates = [];
+
+            for (const [source, url, detailPattern] of sources) {
+              try {
+                const raw = await get(url);
+                const links = extractLinks(raw, url)
+                  .filter(u => new URL(u).hostname === new URL(url).hostname)
+                  .filter(u => detailPattern.test(u))
+                  .filter(u => u !== url)
+                  .slice(0,150);
+
+                core.info(`${source}: ${links.length} candidate detail links`);
+
+                for (const link of links) {
+                  if (!currentListingsRun && existingUrls.has(link)) continue;
+                  try {
+                    const page = await get(link);
+                    const title = compact(titleOf(page), 220);
+                    const desc = compact(descriptionOf(page), 700);
+                    const body = textOnly(page);
+                    const combined = `${title} ${desc} ${body}`;
+
+                    // HARD GATE: never create an alert from a directory/search/category page.
+                    if (looksLikeDirectoryPage(link, title, body)) continue;
+                    if (!hasIndividualNotice(link, body)) continue;
+                    if (!relevant.test(combined) || !actionable.test(combined) || !performerRole.test(combined)) continue;
+                    if (articleNoise.test(title)) continue;
+                    if (forbidden.test(combined)) continue;
+
+                    // Paid-only gate. Equity/union minimums count as paid; otherwise explicit pay is required.
+                    if (!paid.test(combined)) continue;
+
+                    // Performer fit: keep general/open notices, but reject clearly incompatible gender or age requirements.
+                    const ageSpecified = /\b(?:age|aged|years? old|playing age|character age|role age)\b/i.test(combined);
+                    const genderSpecified = /\b(?:male|female|man|woman|men|women|boy|girl|he\/him|she\/her|gender)\b/i.test(combined);
+                    if (ageSpecified && !ageFit.test(combined)) continue;
+                    if (genderSpecified && femaleOnly.test(combined) && !maleFit.test(combined)) continue;
+
+                    const pay = extractPay(body);
+                    if (!pay) continue;
+
+                    candidates.push({source, url: link, title, description: desc, pay, dates: extractDates(body)});
+                  } catch (e) {
+                    core.debug(`Could not inspect ${link}: ${e.message}`);
+                  }
+                }
+              } catch (e) {
+                core.warning(`Could not scan ${source}: ${e.message}`);
+              }
+            }
+
+            // Deduplicate the same notice found through multiple filters/pages.
+            const unique = [...new Map(candidates.map(c => [c.url, c])).values()];
+            let created = 0;
+
+            for (const c of unique) {
+              if (!currentListingsRun && existingUrls.has(c.url)) continue;
+
+              const body = [
+                "## 🎭 PAID CASTING ALERT",
+                "",
+                `**Production / Notice:** ${c.title}`,
+                `**Source:** ${c.source}`,
+                `**Scan:** ${currentListingsRun ? "Current Listings catch-up" : "New listing"}`,
+                c.description ? `**Summary:** ${compact(c.description, 900)}` : "",
+                `**Pay:** ${c.pay}`,
+                c.dates ? `**Dates / deadline:** ${compact(c.dates, 900)}` : "**Dates / deadline:** See original notice.",
+                "",
+                "### Apply",
+                `[OPEN ORIGINAL CASTING NOTICE](${c.url})`,
+                "",
+                "### Radar rules",
+                "✅ Paid performer opportunity",
+                "🚫 Excludes unpaid, stipend/honorarium, deferred/profit-share, pay-to-play, internships and voice-over",
+                "🎯 Performer fit checked against the 20–30 playing-age target where age is specified",
+                "🔎 Individual casting/job notice verified — directory/category pages are rejected",
+                "",
+                "_Verify the live notice, exact compensation, role, eligibility and deadline before applying._"
+              ].filter(Boolean).join("\n\n");
+
+              try {
+                const issue = await github.rest.issues.create({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  title: `${currentListingsRun ? "📋 CURRENT: " : "🎭 "}${c.title}`,
+                  body
+                });
+                existingUrls.add(c.url);
+                created++;
+                core.info(`Created alert #${issue.data.number}: ${c.title}`);
+              } catch (e) {
+                core.warning(`Could not create issue for ${c.url}: ${e.message}`);
+              }
+            }
+
+            // First successful automatic/current scan becomes the baseline. Every later hourly run is NEW only.
+            if (!booted && currentListingsRun) {
+              try {
+                const marker = `Radar v4 bootstrap completed ${new Date().toISOString()}\n\nThe initial current-listings catch-up has completed. Scheduled scans now use new-listing mode.`;
+                const encoded = Buffer.from(marker, "utf8").toString("base64");
+                await github.rest.repos.createOrUpdateFileContents({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: ".casting-radar-v4-bootstrap",
+                  message: "Initialize casting radar v4 hourly baseline",
+                  content: encoded
+                });
+              } catch (e) {
+                core.warning(`Could not write bootstrap marker: ${e.message}`);
+              }
+            }
+
+            core.info(`Casting Radar v4 finished. Created ${created} new alert(s) from ${unique.length} verified individual notices.`);
